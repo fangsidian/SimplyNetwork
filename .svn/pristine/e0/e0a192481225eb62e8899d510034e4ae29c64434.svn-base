@@ -1,0 +1,20 @@
+package architecture;
+
+
+
+public class Manager {
+
+	private static Network network;
+
+	public Manager() {
+		super();
+	}
+	
+	
+	
+	
+}
+
+
+
+

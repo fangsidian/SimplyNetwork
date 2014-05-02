@@ -1,0 +1,511 @@
+package architecture;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+import jxl.read.biff.BiffException;
+
+import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
+
+import dataManager.*;
+import utilities.*;
+
+
+
+//Singleton class
+public class Network {
+	
+	public static final double LEARNING_CONSTANT = 0.01;
+	public static final int ITERATION_MAX = 10000;
+	public static final BigDecimal COTA = new BigDecimal(0.000001);
+	public static final int HEIGHT_MATRIX = 10; //It supposes to be squared
+	public static final int WIDTH_MATRIX = 10; //It supposes to be squared
+	public static final int PRECISION = 10;
+	
+	private static Network instance = null;
+	private static final Logger log = Logger.getLogger(Network.class);
+	//private static final Logger logError = Logger.getLogger("differentlogger");
+	
+	private ArrayList<Neuron> inputs;
+	private ArrayList<Neuron> desiredOutputs; //Desires
+	private ArrayList<Neuron> outputs; //Salidas obtenidas
+	//private int numPatrones;  //Número de patrones usados. Es decir numero de inputs = num outputs = num desired outputs (en caso de entrenamiento)
+	
+	private Company company;
+	
+	private Matrix matrixWeight;
+	private ArrayList<BigDecimal> saveError = new ArrayList<BigDecimal>();
+	
+	private Neuron currentY;
+	private BigDecimal currentE; //Valor de Error actual. 
+	private int iteration; //Número de ronda, por cada una de ellas se prueban TODOS los inputs
+	
+	
+	
+	/** CONSTRUCTORES **/
+	
+	protected Network (Company p){
+		this.company = p; 
+	}
+	
+	public static Network getInstance (Company p){
+	      if(instance == null){
+	         instance = new Network(p);
+	      }
+	     // PropertyConfigurator.configure("log4j.properties"); //Carga del fichero properties
+	    //  WriteOutcomes writer = new WriteOutcomes("C:\\valores.txt"); //Outcomes file
+	      return instance;
+	   }
+
+	/** GETTERS **/
+	
+	public Company getCompany() {
+		return company;
+	}
+	
+	public ArrayList<Neuron> getInputs(){
+		return inputs;
+	}
+	
+	public ArrayList<Neuron> getDesiredOutputs() {
+		return desiredOutputs;
+	}
+	
+	public ArrayList<Neuron> getOutputs() {
+		return outputs;
+	}
+	
+	public Matrix getMatrixWeight() {
+		return matrixWeight;
+	}
+
+	public ArrayList<BigDecimal> getSaveError() {
+		return saveError;
+	}
+
+	public BigDecimal getCurrentE() {
+		return currentE;
+	}
+	
+	public Neuron getInput (int id){
+		return inputs.get(id);
+	}
+	
+	public Neuron getDesiredOutput (int id){
+		return desiredOutputs.get(id);
+	}
+	
+	public Neuron getOutput (int id){
+		return outputs.get(id);
+	}
+	
+	public Neuron getCurrentY() {
+		return currentY;
+	}
+
+
+	
+	/** SETTERS **/
+	
+	public void setCompany(Company company) {
+		this.company = company;
+	}
+	
+	public void setInputs(ArrayList<Neuron> inputs) {
+		this.inputs = inputs;
+	}
+	
+	public void setDesiredOutputs(ArrayList<Neuron> desiredOutputs) {
+		this.desiredOutputs = desiredOutputs;
+	}
+
+	public void setOutputs(ArrayList<Neuron> outputs) {
+		this.outputs = outputs;
+	}
+
+	public void setMatrixWeight(Matrix matrixWeight) {
+		this.matrixWeight = matrixWeight;
+	}
+
+	public void setSaveError(ArrayList<BigDecimal> saveError) {
+		this.saveError = saveError;
+	}
+	
+	public void setCurrentE(BigDecimal currentE) {
+		this.currentE = currentE;
+	}
+
+	public int getIteration() {
+		return iteration;
+	}
+
+
+	public void setIteration(int iteration) {
+		this.iteration = iteration;
+	}
+	
+
+	public void setCurrentY(Neuron currentY) {
+		this.currentY = currentY;
+	}
+
+
+	public static void setInstance(Network instance) {
+		Network.instance = instance;
+	}
+	
+
+//CAMBIAR A LA CLASE NEURON!!!
+	//Iterator<BigDecimal> it = rms.iterator();
+	public static Neuron createNeuronRmNormalized (Iterator<BigDecimal> it, int numDays)
+	{
+		BigDecimal[] values = new BigDecimal[numDays];
+		int i = 0; 
+		while(it.hasNext() && i < numDays){
+			BigDecimal b = it.next();
+			values[i] = b;
+			i++;
+		}
+		Neuron n = new Neuron (values);
+		//n.normalizeNeuron();
+		return n;
+	}
+		
+	//Iterator<BigDecimal> it = ris.iterator();
+	
+	//numDays = Numero de datos que tiene una neurona (tamaño de la neurona)
+	//CAMBIAR A LA CLASE NEURON
+	public static Neuron createNeuronRiNormalized (Iterator<BigDecimal> it, int numDays)
+	{
+		BigDecimal[] values = new BigDecimal[numDays];
+		int i = 0; 
+		while(it.hasNext() && i < numDays){
+			BigDecimal b = it.next();
+			values[i] = b;
+			i++;
+		}
+		Neuron n = new Neuron (values);
+		//n.normalizeNeuron();
+		return n;
+	}
+	
+	//Deveulve un array  con los numPatrones de la red simple TOTALMENTE GENÉRICO
+	//Since: Posibles valores desde 1 hasta el máximo número de quotedays q tenga la empresa 
+	public ArrayList<Neuron> createArrayNeuronsRm (int numPatrones, int since){
+		if ((numPatrones+since+Neuron.SIZE) < company.getQuoteDays()){ 
+			log.info("Creating array with values Rm. Number of patrons: "+numPatrones+" .Since: "+ since);
+			ArrayList<Neuron> arrayRm = new ArrayList<Neuron>();
+			int cont = since-1;
+			Iterator<BigDecimal> it = company.getRms().listIterator(cont);
+			while (it.hasNext() && cont < (numPatrones+since-1)){
+				Neuron n = createNeuronRmNormalized(it, Neuron.SIZE);
+				arrayRm.add(n);
+				cont++;
+				it = company.getRms().listIterator(cont);
+			}
+			return arrayRm;
+		}
+		else{
+			log.error("Los datos Rm que intentas seleccionar están fuera de rango");
+		}
+		return null;
+	}
+	
+	
+	//Deveulve un array  con los numPatrones de la red simple TOTALMENTE GENÉRICO
+		//Since: Posibles valores desde 1 hasta el máximo número de quotedays q tenga la empresa 
+		public ArrayList<Neuron> createArrayNeuronsRi (int numPatrones, int since){
+			if ((numPatrones+since+Neuron.SIZE) < company.getQuoteDays()){ 
+				log.info("Creating array with values Ri. Number of patrons: "+numPatrones+" .Since: "+ since);
+				ArrayList<Neuron> arrayRi = new ArrayList<Neuron>();
+				int cont = since-1;
+				Iterator<BigDecimal> it = company.getRis().listIterator(cont);
+				while (it.hasNext() && cont < (numPatrones+since-1)){
+					Neuron n = createNeuronRiNormalized(it, Neuron.SIZE);
+					arrayRi.add(n);
+					cont++;
+					it = company.getRis().listIterator(cont);
+				}
+				return arrayRi;
+			}
+			else{
+				log.error("Los datos Ri que intentas seleccionar están fuera de rango");
+			}
+			return null;
+		}
+
+			
+	
+		
+		
+		/**
+		 * Crear Matriz de pesos con valores aleatorios.
+		 * @param max Cota superior
+		 * @param min Cota inferior
+		*/
+	public void createRandomWeightMatrix (double min, double max)
+	{
+		log.info("Creating WeightMatrix Random Values");
+		BigDecimal[][] aux = new BigDecimal[HEIGHT_MATRIX][WIDTH_MATRIX];
+		matrixWeight = new Matrix(aux);
+		for (int i = 0; i < HEIGHT_MATRIX; i++){
+			for (int j = 0; j < WIDTH_MATRIX; j++){
+				BigDecRand t = new BigDecRand(max, min, PRECISION);
+				BigDecimal a = t.getValue();
+				matrixWeight.setValuePos(i, j, a);
+			}
+		}
+		matrixWeight.printMatrix();
+	}
+	
+		
+	//Multiplicamos la matriz de pesos por el input q entra por parámetro, y nos devuelve "y"
+	public Neuron fwx (Neuron input)
+	{	
+		log.info ("Aplicamos función (w·x)");
+		Matrix inputT = new Matrix(input.getValues());
+		inputT = Matrix.transponer(inputT);
+		log.trace("input Transpuesto. Filas: "+ inputT.getRow()+ " Columnas: "+ inputT.getColumn());
+		Matrix aux = Matrix.product(matrixWeight, inputT);
+		log.trace("product aux: "+ aux.getRow() +"colum: "+ aux.getColumn());
+		BigDecimal aux2[] = aux.getColumVector(0);
+		BigDecimal yValues[] = new BigDecimal[aux2.length];
+		log.trace("showing values y ");
+		for (int i = 0; i < aux2.length; i++){
+			BigDecimal c = aux2[i].setScale(PRECISION , RoundingMode.HALF_UP);
+			yValues[i] = c;
+			log.trace(c);
+		}
+		
+		
+		return new Neuron (yValues);	}	
+
+	
+	
+//	public void printInputs()
+//	{
+//		for (Neuron n: inputs){
+//			System.out.print("Input: "+inputs.indexOf(n)+"\n");
+//			n.printNeuron();
+//		}
+//	}
+//	
+//	public void printOutputs()
+//	{
+//		for (Neuron n: desiredOutputs){
+//			System.out.print(" Desired Output: "+desiredOutputs.indexOf(n)+"\n");
+//			n.printNeuron();
+//		}
+//	}
+	
+	
+	
+	public void training (){
+		log.info("Training Network \n");
+		boolean endAlgorithm = false;
+		//Inicializamos valores de matriz de pesos y de iteración. 
+		iteration = 0;
+		createRandomWeightMatrix(-0.001, 0.001);
+		WriteOutcomes writer = new WriteOutcomes("C:\\Users\\Esther\\Desktop\\Historial log\\actual\\training.txt", this); //Outcomes file
+		writer.writeBasicInformation();
+		
+		while (!endAlgorithm && iteration < ITERATION_MAX){  
+			saveError = new ArrayList<BigDecimal>();
+			currentE = new BigDecimal(0);
+			
+			for (int i = 0; i<inputs.size(); i++){
+				writer.writeInput(i);
+				writer.writeDesiredOutput(i);
+				writer.writeWeightMatrix();
+				
+				currentY = fwx(inputs.get(i));
+				calculateError(desiredOutputs.get(i));
+				
+				//Actualizamos matriz de pesos
+				log.trace("actualizamos matriz de pesos (d-y): ");
+				Matrix dAux = new Matrix (desiredOutputs.get(i).getValues()); //Se crean con formato vertical (1 fila)
+				Matrix yAux = new Matrix (currentY.getValues());
+				
+				Matrix aux = Matrix.subtraction(dAux, yAux);
+				aux = aux.multEscalar(LEARNING_CONSTANT); 
+				log.trace("Aux dimension--> Filas:" +aux.getRow()+ " Column: "+ aux.getColumn());
+
+				Matrix x = new Matrix (inputs.get(i).getValues());
+				Matrix auxTrans = Matrix.transponer(aux);
+				Matrix delta1 = Matrix.product(auxTrans, x);
+
+				log.trace("Actualizando matriz de pesos con delta 1");
+				matrixWeight = Matrix.addition (matrixWeight, delta1);
+				matrixWeight.truncarMatrixUP(PRECISION);
+			} 
+			
+			iteration++;
+			endAlgorithm = endAlgorithm();
+			log.debug("Iteration number: "+ iteration);
+			writer.writeErrorInf(iteration);
+		}
+		if (iteration == ITERATION_MAX){
+			writer.writeStringAppend("El entrenamiento ha superado el número máximo de iteracciones permitida.\n ");
+		}
+		else{
+			
+			writer.writeSolutionFound (iteration);
+		}
+		
+		writer.closeFile();
+			
+			
+			
+			
+		//calculateOutputs();
+		//Desnormalizamos outputs deseados y obtenidos y comparamos.
+		//desiredOutputs = undoNormalization(desiredOutputs);
+	//	outputs = undoNormalization(outputs);
+//	writer.writeDesiredOutputs();
+	//	writer.writeOutputs();
+//		
+		
+	}
+	
+
+
+	//Calculate error following the formula: E = 1/2 (d-y)^2
+	//Return false if error is bigger than cota.Else en caso contrario 
+	//Output = identificador del desired output
+	public void calculateError (Neuron output){ 
+		log.info("Calculate error");
+		Matrix dAux = new Matrix (output.getValues());
+		Matrix yAux = new Matrix (currentY.getValues());
+		
+		Matrix aux = Matrix.subtraction(dAux, yAux);
+		log.trace("Showing d-y matrix");
+		aux.printMatrix();
+		BigDecimal e = aux.getSumatorioMatrix();
+		e = e.pow(2);
+		e = e.multiply(new BigDecimal (0.5));
+		log.trace("Error = "+ e);
+		saveError.add(e);
+//		if (currentE.compareTo(COTA) == 1){ //El error se pasa de la cota
+//			return false;
+//		}
+//			return true;
+			
+	}
+	
+	
+	//Cuando termina una iteracción, hay q comprobar que el error (la suma de los errores de cada inputs) no se pase de la cota.
+	public boolean endAlgorithm()
+	{
+	BigDecimal acum = new BigDecimal(0);
+	for (BigDecimal error: saveError)
+	{
+		acum = acum.add(error);
+	}
+	acum = acum.divide(new BigDecimal(inputs.size()), RoundingMode.HALF_UP);
+	currentE = acum; 
+	
+	if (currentE.compareTo(COTA) == 1){ //El error se pasa de la cota
+		return false;
+	}
+	return true;	
+	}
+	
+	
+	
+	
+	
+	//después de la fase de entrenamiento, comprobamos las salidas obtenidas (inputs*Matrix de pesos = outputs)
+	//undoNorValues corresponde al valor que usaremos en cada output obtenido para deshacer la normalización
+	public ArrayList<Neuron>calculateOutputs (ArrayList<Neuron> inputs, ArrayList<BigDecimal> undoNorValues){
+		//WriteOutcomes writer = new WriteOutcomes("C:\\Users\\Esther\\Desktop\\Historial log\\actual\\Obtained outputs.txt", this);
+		ArrayList<Neuron> results = new ArrayList<Neuron>();
+		int j = 0; 
+		for (Neuron i: inputs){
+			Matrix aux = new Matrix (i.getValues());
+			aux = Matrix.transponer(aux);
+			aux = Matrix.product(matrixWeight, aux);
+			aux.truncarMatrixUP(PRECISION);
+			BigDecimal values[] = aux.getColumVector(0);
+			
+			Neuron o = new Neuron(values);
+			o.setMaxValue(desiredOutputs.get(j).getMaxValue()); //Necesitamos añadirle el máx de los output deseados
+			//o.setMaxValue(undoNorValues.get(j));
+													//para posteriormente desnormalizar ESTO NO PUEDE QUEDARSE ASI
+			results.add(o);
+			j++;
+			
+		}
+		//desiredOutputs = undoNormalization(desiredOutputs);
+		//results = undoNormalization(results);
+//		writer.writeDesiredOutputs();
+		//	writer.writeOutputs();
+		
+		return results;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+	
+//	public void printErrorValues()
+//	{
+//		log.trace("Imprimiendo valores del vector error");
+//		
+//		
+//		for (int i=0; i<ITERATION_MAX; i++){
+//			log.trace("Error values iteration number: "+ i);
+//			for (int j=0; j< inputs.size(); j++ ){
+//				log.trace("Id input:"+ j+ " E = "+ saveError[i][j]);
+//			
+//			}
+//		
+//		}
+//	
+//	}
+
+	
+	public ArrayList<Neuron> undoNormalization (ArrayList<Neuron> arrayNormalized)
+	{
+		ArrayList<Neuron> aux = new ArrayList<Neuron>();
+		for (Neuron n: arrayNormalized ){
+			n.undoNormalizationNeuron();
+			aux.add(n);			
+		}
+		return aux;
+	}
+	
+	
+	
+	public static void main(String arg[]) throws BiffException, IOException { 		
+		
+	} 
+}
+	
+	
+	
+	
+	
+	
+

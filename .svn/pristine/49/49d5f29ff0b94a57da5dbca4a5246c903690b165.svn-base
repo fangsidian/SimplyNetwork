@@ -1,0 +1,5 @@
+package architecture;
+
+public class InputNeuron extends Neuron {
+
+}

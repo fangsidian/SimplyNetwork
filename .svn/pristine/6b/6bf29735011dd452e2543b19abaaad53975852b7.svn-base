@@ -1,0 +1,92 @@
+package architecture;
+
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Label;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.*;
+import javax.swing.text.JTextComponent;
+
+public class UserInteraction extends JFrame {
+	
+	private JPanel 					contentPanel = new JPanel(),
+									form = new JPanel(),
+									buttons = new JPanel();
+	private JButton 				exit = new JButton("Salir"),
+									training = new JButton("Entrenar Red"),
+									createNetwork = new JButton("Crear red neuronal");
+						
+    public static final int        	WIDTH  	       = 1200;
+    public static final int        	HEIGHT         = 700;
+    Dimension                      	frameSize      = new Dimension(WIDTH, HEIGHT);
+    String                         	title          = "Neuronal Network";
+	
+	
+	
+
+	public UserInteraction() {
+		//Set buttons 
+		createNetwork.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				
+				
+			}
+		});
+		training.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			} 		
+		});
+		exit.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				System.exit(EXIT_ON_CLOSE);
+				
+			}
+		});
+		buttons.add(createNetwork, BorderLayout.NORTH);
+		buttons.add(training,BorderLayout.SOUTH);
+		buttons.add(exit,BorderLayout.PAGE_END);
+		
+		contentPanel.add(buttons);
+		this.add(contentPanel);
+	
+		this.setSize(frameSize);
+		this.setTitle(title);
+		setContentPane(contentPanel);
+		this.setVisible(true);
+	}
+	
+	
+	
+	public void createForm()
+	{
+		Label empresa = new Label("Identificador de la empresa: ");
+		Label patrones = new Label("Número de patrones de aprendizaje: ");
+		Label coeficienteApren = new Label("Coeficiente de aprendizaje: ");
+		Label cotaError = new Label("Cota de error: ");
+		Label maxIt = new Label("Máximo número de iteracciones permitidas:  ");
+		
+		
+		
+		
+		
+		
+	}
+	
+	
+    public static void main (String[] args)
+    { 
+     UserInteraction a = new UserInteraction();
+    }
+	
+	
+}
